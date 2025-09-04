@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Story Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Baloo 2', cursive;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .jeopardy-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            perspective: 1000px;
+        }
+        .category-header {
+            background-color: #2c3e50;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            min-height: 100px;
+        }
+        .card {
+            background-color: #3498db;
+            color: #f1c40f;
+            font-size: 2.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            transition: transform 0.3s ease, background-color 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            height: 120px;
+        }
+        .card:hover {
+            transform: scale(1.05);
+            background-color: #2980b9;
+        }
+        .card.disabled {
+            background-color: #7f8c8d;
+            color: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #modal, #confirm-modal, #manual-edit-modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content {
+            transform: scale(0.9);
+            transition: transform 0.3s ease-in-out;
+        }
+        #modal.active .modal-content, #manual-edit-modal.active .modal-content {
+            transform: scale(1);
+        }
+        .team-scores {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (min-width: 768px) {
+            .team-scores {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        .team-card {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: all 0.2s ease-in-out;
+        }
+        .team-card--highlight {
+            transform: scale(1.1);
+            background-color: #f1c40f;
+            box-shadow: 0 0 20px #f1c40f;
+        }
+        .team-card--highlight .team-name-input, .team-card--highlight .team-score {
+            color: #2c3e50;
+        }
+        .team-name-input {
+            background-color: transparent;
+            border: none;
+            border-bottom: 2px solid #f1c40f;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            width: 100%;
+            padding-bottom: 0.5rem;
+        }
+        .team-score {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #f1c40f;
+            margin-top: 0.5rem;
+        }
+        .team-edit-btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-white flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-6xl mx-auto">
+        <header class="text-center mb-6">
+            <h1 class="text-5xl md:text-6xl font-bold text-yellow-300 drop-shadow-lg">Math Story Challenge</h1>
+            <p class="text-xl mt-2 text-gray-200">Enter your team names and click a box to solve a problem!</p>
+        </header>
+
+        <div id="team-scores" class="team-scores"></div>
+
+        <div class="text-center mb-6">
+             <button id="reset-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 text-lg">Reset Game</button>
+        </div>
+
+        <main id="game-board" class="jeopardy-board">
+            <div class="category-header">Addition Stories</div>
+            <div class="category-header">Subtraction Stories</div>
+            <div class="category-header">Multiplication Stories</div>
+            <div class="category-header">Mixed Bag</div>
+        </main>
+    </div>
+
+    <!-- Question Modal -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 opacity-0 pointer-events-none">
+        <div id="modal-content" class="modal-content bg-white text-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-lg text-center relative">
+            <h2 id="category-title" class="text-2xl font-bold mb-4 text-indigo-600">Category</h2>
+            <p id="question-text" class="text-xl md:text-2xl mb-6 min-h-[100px]"></p>
+            <input type="number" id="answer-input" class="w-full p-3 text-2xl border-2 border-gray-300 rounded-lg mb-4 text-center" placeholder="Type your answer...">
+            <div id="feedback" class="text-lg font-semibold mb-4 h-6"></div>
+            
+            <div id="team-award-section" class="hidden mt-4">
+                <p class="font-bold text-lg mb-2">Who answered?</p>
+                <div id="team-award-buttons" class="flex flex-wrap justify-center gap-2"></div>
+            </div>
+
+            <div id="wrong-answer-section" class="hidden mt-4 space-y-3">
+                <p class="font-bold text-lg">What would you like to do?</p>
+                <button id="deduct-points-btn" class="bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg w-full">Deduct Points</button>
+                <button id="initiate-steal-btn" class="bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg w-full">Initiate Steal!</button>
+            </div>
+
+            <div class="flex justify-center space-x-4 mt-6">
+                 <button id="submit-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-md text-xl">Submit</button>
+                 <button id="close-modal-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg shadow-md text-xl hidden">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Other Modals -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 opacity-0 pointer-events-none">
+        <div class="bg-white text-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-4">Are you sure?</h2>
+            <p class="text-lg mb-6">This will reset all scores.</p>
+            <div class="flex justify-center space-x-4">
+                 <button id="confirm-reset-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg">Yes, Reset</button>
+                 <button id="cancel-reset-btn" class="bg-gray-400 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="manual-edit-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 opacity-0 pointer-events-none">
+        <div class="modal-content bg-white text-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
+            <h2 id="manual-edit-title" class="text-2xl font-bold mb-4">Edit Score</h2>
+            <p class="mb-4">Enter points to add or subtract (e.g., 100 or -50).</p>
+            <input type="number" id="manual-points-input" class="w-full p-3 text-2xl border-2 border-gray-300 rounded-lg mb-4 text-center" placeholder="0">
+            <div class="flex justify-center space-x-4">
+                <button id="save-manual-points-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Save</button>
+                <button id="cancel-manual-points-btn" class="bg-gray-400 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // All game data and logic remains here...
+        const gameData = [
+            {
+                category: "Addition Stories",
+                questions: [
+                    { points: 100, question: "A concert hall sold 1,250 tickets on Saturday and 1,350 on Sunday. How many tickets were sold in total?", answer: 2600 },
+                    { points: 200, question: "A cargo ship carries 2,400 boxes of bananas and 1,850 boxes of apples. How many boxes of fruit are on the ship?", answer: 4250 },
+                    { points: 300, question: "A city library has 5,620 books for adults and 3,180 for children. How many books does the library have in total?", answer: 8800 },
+                    { points: 400, question: "A video game sold 4,555 copies in the first month and 3,999 in the second month. How many copies were sold in two months?", answer: 8554 },
+                    { points: 500, question: "An airline flew 6,780 kilometers on one trip and 4,321 kilometers on another. What is the total distance flown?", answer: 11101 }
+                ]
+            },
+            {
+                category: "Subtraction Stories",
+                questions: [
+                    { points: 100, question: "A stadium has 8,500 seats. If 6,200 seats are filled, how many seats are empty?", answer: 2300 },
+                    { points: 200, question: "A company had $5,600. After paying bills, it has $2,350 left. How much did the bills cost?", answer: 3250 },
+                    { points: 300, question: "A baker made 2,500 cookies. He sold 1,350 of them. How many cookies are left?", answer: 1150 },
+                    { points: 400, question: "The distance between two cities is 4,321 kilometers. A train has traveled 1,987 kilometers. How many kilometers are left?", answer: 2334 },
+                    { points: 500, question: "A mountain is 8,848 meters high. A climber is at an altitude of 6,990 meters. How many more meters to the summit?", answer: 1858 }
+                ]
+            },
+            {
+                category: "Multiplication Stories",
+                questions: [
+                    { points: 100, question: "There are 7 days in a week. How many days are in 8 weeks?", answer: 56 },
+                    { points: 200, question: "A garden has 6 rows of plants. Each row has 9 plants. How many plants are in the garden?", answer: 54 },
+                    { points: 300, question: "An octopus has 8 arms. How many arms would 8 octopuses have?", answer: 64 },
+                    { points: 400, question: "If one box holds 9 crayons, how many crayons do 7 boxes hold?", answer: 63 },
+                    { points: 500, question: "You earn 9 stars for each level of a game. How many stars will you have after completing 9 levels?", answer: 81 }
+                ]
+            },
+            {
+                category: "Mixed Bag",
+                questions: [
+                    { points: 100, question: "A store has 150 shirts. They sell 50, then receive 120 more. How many shirts are there now?", answer: 220 },
+                    { points: 200, question: "There are 8 rows of chairs with 9 chairs in each row. If 15 people sit down, how many chairs are empty?", answer: 57 },
+                    { points: 300, question: "You need 500 points to win. You have 275 points, and you earn 150 more. How many more points do you need?", answer: 75 },
+                    { points: 400, question: "A train has 400 seats. 180 people get on at the first stop and 150 get on at the second. How many seats are still empty?", answer: 70 },
+                    { points: 500, question: "A company makes 9 toy cars an hour for 8 hours. They need 100 cars for an order. How many more do they need to make?", answer: 28 }
+                ]
+            }
+        ];
+        
+        // DOM Elements
+        const elements = {
+            gameBoard: document.getElementById('game-board'),
+            teamScoresContainer: document.getElementById('team-scores'),
+            modal: document.getElementById('modal'),
+            categoryTitle: document.getElementById('category-title'),
+            questionText: document.getElementById('question-text'),
+            answerInput: document.getElementById('answer-input'),
+            submitBtn: document.getElementById('submit-btn'),
+            closeModalBtn: document.getElementById('close-modal-btn'),
+            feedback: document.getElementById('feedback'),
+            teamAwardSection: document.getElementById('team-award-section'),
+            teamAwardButtons: document.getElementById('team-award-buttons'),
+            wrongAnswerSection: document.getElementById('wrong-answer-section'),
+            deductPointsBtn: document.getElementById('deduct-points-btn'),
+            initiateStealBtn: document.getElementById('initiate-steal-btn'),
+            resetBtn: document.getElementById('reset-btn'),
+            confirmModal: document.getElementById('confirm-modal'),
+            confirmResetBtn: document.getElementById('confirm-reset-btn'),
+            cancelResetBtn: document.getElementById('cancel-reset-btn'),
+            manualEditModal: document.getElementById('manual-edit-modal'),
+            manualEditTitle: document.getElementById('manual-edit-title'),
+            manualPointsInput: document.getElementById('manual-points-input'),
+            saveManualPointsBtn: document.getElementById('save-manual-points-btn'),
+            cancelManualPointsBtn: document.getElementById('cancel-manual-points-btn'),
+        };
+
+        let teams = [];
+        let currentQuestion = null;
+        let answeringTeamIndex = null;
+        let teamToEditIndex = null;
+        
+        function setupTeams() {
+            teams = [];
+            elements.teamScoresContainer.innerHTML = '';
+            for(let i=0; i < 6; i++) {
+                const teamData = { name: `Team ${i+1}`, score: 0 };
+                teams.push(teamData);
+
+                const teamCard = document.createElement('div');
+                teamCard.className = 'team-card';
+                teamCard.id = `team-card-${i}`;
+                
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.className = 'team-name-input';
+                nameInput.value = teamData.name;
+                nameInput.addEventListener('change', () => teams[i].name = nameInput.value);
+
+                const scoreDiv = document.createElement('div');
+                scoreDiv.className = 'team-score';
+                scoreDiv.textContent = '0';
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = 'team-edit-btn';
+                editBtn.textContent = 'Edit';
+                editBtn.addEventListener('click', () => showManualEditModal(i));
+
+                teamCard.append(nameInput, scoreDiv, editBtn);
+                elements.teamScoresContainer.appendChild(teamCard);
+            }
+        }
+
+        function initGame() {
+            elements.gameBoard.querySelectorAll('.card').forEach(card => card.remove());
+            teams.forEach(team => team.score = 0);
+            updateAllTeamScores();
+            const pointLevels = [100, 200, 300, 400, 500];
+            const fragment = document.createDocumentFragment();
+            for (let points of pointLevels) {
+                for (let category of gameData) {
+                    const question = category.questions.find(q => q.points === points);
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.textContent = points;
+                    card.dataset.category = category.category;
+                    card.dataset.points = points;
+                    card.addEventListener('click', handleCardClick);
+                    fragment.appendChild(card);
+                }
+            }
+            elements.gameBoard.appendChild(fragment);
+        }
+
+        function handleCardClick(event) {
+            const card = event.target;
+            if (card.classList.contains('disabled')) return;
+            const category = card.dataset.category;
+            const points = parseInt(card.dataset.points);
+            currentQuestion = gameData.find(c => c.category === category).questions.find(q => q.points === points);
+            elements.categoryTitle.textContent = category;
+            elements.questionText.textContent = currentQuestion.question;
+            showModal();
+            card.classList.add('disabled');
+        }
+
+        function showModal() {
+            // Reset modal state
+            elements.feedback.textContent = '';
+            elements.answerInput.value = '';
+            elements.answerInput.disabled = false;
+            elements.submitBtn.classList.remove('hidden');
+            elements.closeModalBtn.classList.add('hidden');
+            elements.teamAwardSection.classList.add('hidden');
+            elements.wrongAnswerSection.classList.add('hidden');
+            
+            elements.modal.classList.add('active');
+            elements.modal.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => elements.answerInput.focus(), 100);
+        }
+
+        function hideModal() {
+            elements.modal.classList.remove('active');
+            elements.modal.classList.add('opacity-0', 'pointer-events-none');
+            currentQuestion = null;
+            answeringTeamIndex = null;
+            elements.submitBtn.onclick = checkAnswer; // Reset submit button
+        }
+
+        function checkAnswer() {
+            const userAnswer = parseInt(elements.answerInput.value);
+            if (isNaN(userAnswer)) {
+                elements.feedback.textContent = "Please enter a number.";
+                elements.feedback.style.color = 'orange';
+                return;
+            }
+
+            elements.answerInput.disabled = true;
+            elements.submitBtn.classList.add('hidden');
+
+            if (userAnswer === currentQuestion.answer) {
+                elements.feedback.textContent = `Correct! +${currentQuestion.points} points!`;
+                elements.feedback.style.color = 'green';
+                renderTeamAwardButtons(true); // Award points
+            } else {
+                elements.feedback.textContent = 'Not quite. That is incorrect.';
+                elements.feedback.style.color = 'red';
+                renderTeamAwardButtons(false); // Choose who answered wrong
+            }
+        }
+        
+        function renderTeamAwardButtons(isCorrect) {
+            const buttonContainer = elements.teamAwardButtons;
+            buttonContainer.innerHTML = '';
+            if (isCorrect) {
+                elements.teamAwardSection.querySelector('p').textContent = 'Who gets the points?';
+            } else {
+                elements.teamAwardSection.querySelector('p').textContent = 'Who answered incorrectly?';
+            }
+            
+            teams.forEach((team, index) => {
+                const btn = document.createElement('button');
+                btn.textContent = team.name;
+                const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-600', 'bg-pink-500', 'bg-teal-500'];
+                btn.className = `p-2 rounded-lg text-white ${colors[index % colors.length]}`;
+                btn.onclick = () => {
+                    if (isCorrect) {
+                        updateScore(index, currentQuestion.points);
+                        hideModal();
+                    } else {
+                        answeringTeamIndex = index;
+                        elements.teamAwardSection.classList.add('hidden');
+                        elements.wrongAnswerSection.classList.remove('hidden');
+                    }
+                };
+                buttonContainer.appendChild(btn);
+            });
+            elements.teamAwardSection.classList.remove('hidden');
+        }
+
+        function startStealSequence() {
+            updateScore(answeringTeamIndex, -currentQuestion.points); // Deduct points first
+            
+            // Manually hide modal so roulette is visible, but KEEP currentQuestion data
+            elements.modal.classList.remove('active');
+            elements.modal.classList.add('opacity-0', 'pointer-events-none');
+            
+            const otherTeams = teams.map((t, i) => i).filter(i => i !== answeringTeamIndex);
+            if (otherTeams.length === 0) return; // No one to steal from
+
+            let interval;
+            let highlightIndex = 0;
+            const rouletteDuration = 3000 + Math.random() * 2000;
+
+            interval = setInterval(() => {
+                document.querySelectorAll('.team-card').forEach(c => c.classList.remove('team-card--highlight'));
+                const teamToHighlight = otherTeams[highlightIndex % otherTeams.length];
+                document.getElementById(`team-card-${teamToHighlight}`).classList.add('team-card--highlight');
+                highlightIndex++;
+            }, 100);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                const winningIndex = otherTeams[Math.floor(Math.random() * otherTeams.length)];
+                document.querySelectorAll('.team-card').forEach(c => c.classList.remove('team-card--highlight'));
+                document.getElementById(`team-card-${winningIndex}`).classList.add('team-card--highlight');
+
+                setTimeout(() => {
+                   document.getElementById(`team-card-${winningIndex}`).classList.remove('team-card--highlight');
+                   openStealModal(winningIndex);
+                }, 1500);
+            }, rouletteDuration);
+        }
+        
+        function openStealModal(stealingTeamIndex) {
+            showModal();
+            elements.categoryTitle.textContent = `${teams[stealingTeamIndex].name}'s chance to steal!`;
+            elements.submitBtn.onclick = () => checkStealAnswer(stealingTeamIndex);
+        }
+        
+        function checkStealAnswer(stealingTeamIndex) {
+            const userAnswer = parseInt(elements.answerInput.value);
+            if (isNaN(userAnswer)) {
+                elements.feedback.textContent = "Please enter a number.";
+                elements.feedback.style.color = 'orange';
+                return;
+            }
+
+            elements.answerInput.disabled = true;
+            elements.submitBtn.classList.add('hidden');
+            
+            if (userAnswer === currentQuestion.answer) {
+                updateScore(stealingTeamIndex, currentQuestion.points);
+                elements.feedback.textContent = `${teams[stealingTeamIndex].name} stole the points!`;
+                elements.feedback.style.color = 'green';
+            } else {
+                updateScore(stealingTeamIndex, -currentQuestion.points);
+                elements.feedback.textContent = `Oh no! ${teams[stealingTeamIndex].name} answered incorrectly and lost points.`;
+                elements.feedback.style.color = 'red';
+            }
+            setTimeout(hideModal, 2500);
+        }
+
+        function updateScore(teamIndex, points) {
+            teams[teamIndex].score += points;
+            document.querySelector(`#team-card-${teamIndex} .team-score`).textContent = teams[teamIndex].score;
+        }
+
+        function updateAllTeamScores() {
+            teams.forEach((team, index) => {
+                document.querySelector(`#team-card-${index} .team-score`).textContent = team.score;
+            });
+        }
+        
+        function showManualEditModal(index) {
+            teamToEditIndex = index;
+            elements.manualEditTitle.textContent = `Edit Score for ${teams[index].name}`;
+            elements.manualPointsInput.value = '';
+            elements.manualEditModal.classList.add('active');
+            elements.manualEditModal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function hideManualEditModal() {
+            elements.manualEditModal.classList.remove('active');
+            elements.manualEditModal.classList.add('opacity-0', 'pointer-events-none');
+            teamToEditIndex = null;
+        }
+
+        // Event Listeners
+        elements.submitBtn.addEventListener('click', checkAnswer);
+        elements.answerInput.addEventListener('keyup', (e) => e.key === 'Enter' && elements.submitBtn.click());
+        elements.closeModalBtn.addEventListener('click', hideModal);
+        
+        elements.deductPointsBtn.addEventListener('click', () => {
+            updateScore(answeringTeamIndex, -currentQuestion.points);
+            hideModal();
+        });
+        
+        elements.initiateStealBtn.addEventListener('click', startStealSequence);
+        
+        elements.resetBtn.addEventListener('click', () => elements.confirmModal.classList.remove('opacity-0', 'pointer-events-none'));
+        elements.cancelResetBtn.addEventListener('click', () => elements.confirmModal.classList.add('opacity-0', 'pointer-events-none'));
+        elements.confirmResetBtn.addEventListener('click', () => {
+            elements.confirmModal.classList.add('opacity-0', 'pointer-events-none');
+            setupTeams();
+            initGame();
+        });
+
+        elements.saveManualPointsBtn.addEventListener('click', () => {
+            const pointsToAdd = parseInt(elements.manualPointsInput.value) || 0;
+            if (teamToEditIndex !== null) {
+                updateScore(teamToEditIndex, pointsToAdd);
+            }
+            hideManualEditModal();
+        });
+        elements.cancelManualPointsBtn.addEventListener('click', hideManualEditModal);
+
+        // Initial Setup
+        setupTeams();
+        initGame();
+    </script>
+</body>
+</html>
+
+
